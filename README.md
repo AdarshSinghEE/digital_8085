@@ -183,9 +183,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Contact
 
-Your Name - [@yourtwitter](https://twitter.com/yourtwitter)
+Adarsh Singh - [@adarsh-singh-2711782b2](https://www.linkedin.com/in/adarsh-singh-2711782b2/)
 
-Project Link: [https://github.com/yourusername/8085-simulator](https://github.com/yourusername/8085-simulator)
+Project Link: [https://github.com/AdarshSinghEE/8085-simulator](https://github.com/AdarshSinghEE/digital_8085)
 
 ---
 
