@@ -18,8 +18,8 @@ An interactive web-based simulator for the Intel 8085 microprocessor with real-t
 - *Timing Diagrams*: Real-time clock waveforms and machine cycle analysis
 
 ## Screenshots
+![WhatsApp Image 2025-11-08 at 17 07 14_91b78bc0](https://github.com/user-attachments/assets/f957bcd8-de32-464f-943e-30b815562b44)
 
-Add screenshots of your simulator here
 
 ## Supported Instructions
 
