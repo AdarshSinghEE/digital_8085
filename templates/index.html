@@ -1,0 +1,815 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8085 Microprocessor Simulator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: #333;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            grid-template-rows: 60px 1fr 180px;
+            height: 100vh;
+            gap: 10px;
+            padding: 10px;
+        }
+        
+        .header {
+            grid-column: 1 / -1;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 10px;
+            padding: 15px 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.4);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+        
+        .code-panel {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .code-panel h2 {
+            margin-bottom: 15px;
+            color: #1e3a8a;
+            font-size: 18px;
+        }
+        
+        textarea {
+            flex: 1;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            resize: none;
+            background: #f8fafc;
+        }
+        
+        .error-panel {
+            margin-top: 10px;
+            padding: 10px;
+            background: #fee;
+            border-left: 4px solid #ef4444;
+            border-radius: 5px;
+            display: none;
+            max-height: 100px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        
+        .error-panel.show {
+            display: block;
+        }
+        
+        .block-diagram {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            position: relative;
+            overflow: auto;
+        }
+        
+        .timing-diagram {
+            grid-column: 1 / -1;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 10px;
+            padding: 15px 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .timing-diagram h2 {
+            color: #1e3a8a;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        canvas {
+            width: 100%;
+            height: 120px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+        
+        /* SVG Diagram Container */
+        #diagramSVG {
+            width: 100%;
+            height: 100%;
+            min-height: 600px;
+        }
+        
+        /* Component Styles */
+        .component-box {
+            fill: #3b82f6;
+            stroke: #1e40af;
+            stroke-width: 2;
+        }
+        
+        .component-box.active {
+            fill: #fbbf24;
+            stroke: #f59e0b;
+            stroke-width: 3;
+            filter: drop-shadow(0 0 8px #fbbf24);
+        }
+        
+        .component-box.alu {
+            fill: #8b5cf6;
+        }
+        
+        .component-box.register {
+            fill: #10b981;
+        }
+        
+        .component-box.memory {
+            fill: #06b6d4;
+        }
+        
+        .component-box.control {
+            fill: #ef4444;
+        }
+        
+        .component-text {
+            fill: white;
+            font-weight: bold;
+            font-size: 12px;
+            text-anchor: middle;
+        }
+        
+        .component-value {
+            fill: #fef3c7;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            text-anchor: middle;
+            font-weight: bold;
+        }
+        
+        .wire {
+            stroke: #64748b;
+            stroke-width: 2;
+            fill: none;
+        }
+        
+        .wire.active {
+            stroke: #fbbf24;
+            stroke-width: 3;
+            filter: drop-shadow(0 0 4px #fbbf24);
+        }
+        
+        .bus-line {
+            stroke: #475569;
+            stroke-width: 4;
+            fill: none;
+        }
+        
+        .bus-line.active {
+            stroke: #f59e0b;
+            stroke-width: 5;
+            filter: drop-shadow(0 0 6px #f59e0b);
+        }
+        
+        .bus-label {
+            fill: #1e293b;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        /* Data Flow Animation */
+        .data-particle {
+            fill: #fbbf24;
+            filter: drop-shadow(0 0 4px #f59e0b);
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; r: 4; }
+            50% { opacity: 0.6; r: 6; }
+        }
+        
+        .status-display {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+            z-index: 100;
+        }
+        
+        .timing-signals {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .signal-box {
+            background: #f1f5f9;
+            padding: 8px;
+            border-radius: 6px;
+            border-left: 3px solid #3b82f6;
+        }
+        
+        .signal-label {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 600;
+        }
+        
+        .signal-value {
+            font-size: 14px;
+            color: #1e293b;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖥️ Intel 8085 Microprocessor Simulator</h1>
+            <div class="controls">
+                <button class="btn-primary" onclick="assembleCode()">📝 Assemble</button>
+                <button class="btn-success" onclick="executeStep()">▶️ Step</button>
+                <button class="btn-primary" onclick="runProgram()">⏩ Run</button>
+                <button class="btn-danger" onclick="resetSimulator()">🔄 Reset</button>
+            </div>
+        </div>
+        
+        <div class="code-panel">
+            <h2>Assembly Code Editor</h2>
+            <textarea id="codeEditor" placeholder="Enter 8085 assembly code...">MVI A, 0AH
+MVI B, 05H
+ADD B
+MOV C, A
+INR C
+STA 2050H
+HLT</textarea>
+            <div id="errorPanel" class="error-panel"></div>
+        </div>
+        
+        <div class="block-diagram">
+            <div class="status-display" id="statusDisplay">System Ready</div>
+            <svg id="diagramSVG" viewBox="0 0 900 600"></svg>
+        </div>
+        
+        <div class="timing-diagram">
+            <h2>Machine Cycle & Control Signals</h2>
+            <div class="timing-signals">
+                <div class="signal-box">
+                    <div class="signal-label">IO/M̅</div>
+                    <div class="signal-value" id="sigIOM">0</div>
+                </div>
+                <div class="signal-box">
+                    <div class="signal-label">S1</div>
+                    <div class="signal-value" id="sigS1">0</div>
+                </div>
+                <div class="signal-box">
+                    <div class="signal-label">S0</div>
+                    <div class="signal-value" id="sigS0">0</div>
+                </div>
+                <div class="signal-box">
+                    <div class="signal-label">ALE</div>
+                    <div class="signal-value" id="sigALE">0</div>
+                </div>
+                <div class="signal-box">
+                    <div class="signal-label">RD̅</div>
+                    <div class="signal-value" id="sigRD">1</div>
+                </div>
+                <div class="signal-box">
+                    <div class="signal-label">WR̅</div>
+                    <div class="signal-value" id="sigWR">1</div>
+                </div>
+                <div class="signal-box">
+                    <div class="signal-label">T-State</div>
+                    <div class="signal-value" id="sigTState">T1</div>
+                </div>
+            </div>
+            <canvas id="timingCanvas"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const socket = io('http://localhost:5000');
+        let currentCycle = 0;
+        let running = false;
+        
+        // SVG Elements
+        const svg = document.getElementById('diagramSVG');
+        const NS = "http://www.w3.org/2000/svg";
+        
+        // Component positions (x, y, width, height)
+        const components = {
+            // Top Row - Registers
+            regB: {x: 600, y: 50, w: 60, h: 50, label: 'B', value: '00H', type: 'register'},
+            regC: {x: 670, y: 50, w: 60, h: 50, label: 'C', value: '00H', type: 'register'},
+            regD: {x: 740, y: 50, w: 60, h: 50, label: 'D', value: '00H', type: 'register'},
+            regE: {x: 810, y: 50, w: 60, h: 50, label: 'E', value: '00H', type: 'register'},
+            
+            // Second Row
+            regH: {x: 600, y: 110, w: 60, h: 50, label: 'H', value: '00H', type: 'register'},
+            regL: {x: 670, y: 110, w: 60, h: 50, label: 'L', value: '00H', type: 'register'},
+            sp: {x: 740, y: 110, w: 60, h: 50, label: 'SP', value: 'FFFF', type: 'register'},
+            pc: {x: 810, y: 110, w: 60, h: 50, label: 'PC', value: '0000', type: 'register'},
+            
+            // Left Side - ALU and Accumulator
+            accumulator: {x: 50, y: 210, w: 80, h: 60, label: 'ACC (A)', value: '00H', type: 'register'},
+            tempReg: {x: 160, y: 210, w: 80, h: 60, label: 'TEMP', value: '00H', type: 'register'},
+            flags: {x: 50, y: 280, w: 80, h: 40, label: 'FLAGS', value: 'SZAPC', type: 'register'},
+            
+            alu: {x: 160, y: 280, w: 80, h: 60, label: 'ALU', value: '', type: 'alu'},
+            
+            // Center - Instruction Register and Decoder
+            ir: {x: 350, y: 100, w: 120, h: 50, label: 'Instruction Reg', value: '00H', type: 'control'},
+            decoder: {x: 350, y: 160, w: 120, h: 60, label: 'Decoder', value: '', type: 'control'},
+            
+            // Control Unit
+            controlUnit: {x: 320, y: 240, w: 180, h: 80, label: 'Control Unit', value: '', type: 'control'},
+            
+            // Timing and Control
+            timing: {x: 510, y: 240, w: 150, h: 80, label: 'Timing\nControl', value: '', type: 'control'},
+            
+            // Bottom - Memory
+            memory: {x: 350, y: 420, w: 180, h: 80, label: 'MEMORY (64KB)', value: '', type: 'memory'},
+            
+            // Address/Data Buffer
+            addrBuffer: {x: 350, y: 340, w: 80, h: 60, label: 'Addr\nBuffer', value: '', type: 'control'},
+            dataBuffer: {x: 450, y: 340, w: 80, h: 60, label: 'Data\nBuffer', value: '', type: 'control'},
+        };
+        
+        // Bus positions
+        const buses = {
+            internalData: {x1: 50, y1: 200, x2: 850, y2: 200, label: '8-bit Internal Data Bus'},
+            addressBus: {x1: 50, y1: 370, x2: 520, y2: 370, label: '16-bit Address Bus'},
+            dataBus: {x1: 50, y1: 520, x2: 850, y2: 520, label: '8-bit Data Bus'},
+        };
+        
+        // Wire connections
+        const wires = [
+            // Accumulator connections
+            {id: 'wire_acc_alu', path: 'M 90 240 L 90 250', type: 'vertical'},
+            {id: 'wire_temp_alu', path: 'M 200 340 L 200 250', type: 'vertical'},
+            {id: 'wire_alu_acc', path: 'M 200 310 L 90 310 L 90 240', type: 'feedback'},
+            
+            // Internal bus connections to registers
+            {id: 'wire_b_bus', path: 'M 630 100 L 630 520', type: 'vertical'},
+            {id: 'wire_c_bus', path: 'M 700 100 L 700 520', type: 'vertical'},
+            {id: 'wire_d_bus', path: 'M 770 100 L 770 520', type: 'vertical'},
+            {id: 'wire_e_bus', path: 'M 840 100 L 840 520', type: 'vertical'},
+            {id: 'wire_h_bus', path: 'M 630 160 L 630 520', type: 'vertical'},
+            {id: 'wire_l_bus', path: 'M 700 160 L 700 200', type: 'vertical'},
+            
+            // PC and SP to address buffer
+            {id: 'wire_pc_addr', path: 'M 840 160 L 840 520', type: 'complex'},
+            {id: 'wire_sp_addr', path: 'M 770 160 L 770 520', type: 'complex'},
+            
+            // IR to Decoder
+            {id: 'wire_ir_decoder', path: 'M 410 150 L 410 160', type: 'vertical'},
+            
+            // Decoder to Control Unit
+            {id: 'wire_decoder_cu', path: 'M 410 220 L 410 240', type: 'vertical'},
+            
+            // Control Unit to components (simplified)
+            {id: 'wire_cu_timing', path: 'M 500 280 L 510 280', type: 'horizontal'},
+            
+            // Address buffer to address bus
+            {id: 'wire_addr_bus', path: 'M 390 400 L 390 370', type: 'vertical'},
+            
+            // Data buffer to data bus
+            {id: 'wire_data_bus', path: 'M 490 400 L 490 420', type: 'vertical'},
+            
+            // Memory connections
+            {id: 'wire_mem_addr', path: 'M 440 420 L 440 370', type: 'vertical'},
+            {id: 'wire_mem_data', path: 'M 440 500 L 440 520', type: 'vertical'},
+        ];
+        
+        // Initialize diagram
+        function initDiagram() {
+            // Clear SVG
+            svg.innerHTML = '';
+            
+            // Draw buses first (background)
+            drawBuses();
+            
+            // Draw wires
+            wires.forEach(wire => {
+                const path = document.createElementNS(NS, 'path');
+                path.setAttribute('d', wire.path);
+                path.setAttribute('class', 'wire');
+                path.setAttribute('id', wire.id);
+                svg.appendChild(path);
+            });
+            
+            // Draw components
+            Object.keys(components).forEach(key => {
+                const comp = components[key];
+                const group = document.createElementNS(NS, 'g');
+                group.setAttribute('id', key);
+                
+                const rect = document.createElementNS(NS, 'rect');
+                rect.setAttribute('x', comp.x);
+                rect.setAttribute('y', comp.y);
+                rect.setAttribute('width', comp.w);
+                rect.setAttribute('height', comp.h);
+                rect.setAttribute('rx', '5');
+                rect.setAttribute('class', `component-box ${comp.type}`);
+                rect.setAttribute('id', `${key}_box`);
+                group.appendChild(rect);
+                
+                const text = document.createElementNS(NS, 'text');
+                text.setAttribute('x', comp.x + comp.w/2);
+                text.setAttribute('y', comp.y + comp.h/2 - 8);
+                text.setAttribute('class', 'component-text');
+                text.textContent = comp.label;
+                group.appendChild(text);
+                
+                if (comp.value) {
+                    const valueText = document.createElementNS(NS, 'text');
+                    valueText.setAttribute('x', comp.x + comp.w/2);
+                    valueText.setAttribute('y', comp.y + comp.h/2 + 10);
+                    valueText.setAttribute('class', 'component-value');
+                    valueText.setAttribute('id', `${key}_value`);
+                    valueText.textContent = comp.value;
+                    group.appendChild(valueText);
+                }
+                
+                svg.appendChild(group);
+            });
+        }
+        
+        function drawBuses() {
+            // Internal Data Bus
+            const internalBus = document.createElementNS(NS, 'line');
+            internalBus.setAttribute('x1', buses.internalData.x1);
+            internalBus.setAttribute('y1', buses.internalData.y1);
+            internalBus.setAttribute('x2', buses.internalData.x2);
+            internalBus.setAttribute('y2', buses.internalData.y2);
+            internalBus.setAttribute('class', 'bus-line');
+            internalBus.setAttribute('id', 'internal_bus');
+            svg.appendChild(internalBus);
+            
+            const internalLabel = document.createElementNS(NS, 'text');
+            internalLabel.setAttribute('x', 20);
+            internalLabel.setAttribute('y', 195);
+            internalLabel.setAttribute('class', 'bus-label');
+            internalLabel.textContent = 'Internal Data Bus';
+            svg.appendChild(internalLabel);
+            
+            // Address Bus
+            const addrBus = document.createElementNS(NS, 'line');
+            addrBus.setAttribute('x1', buses.addressBus.x1);
+            addrBus.setAttribute('y1', buses.addressBus.y1);
+            addrBus.setAttribute('x2', buses.addressBus.x2);
+            addrBus.setAttribute('y2', buses.addressBus.y2);
+            addrBus.setAttribute('class', 'bus-line');
+            addrBus.setAttribute('id', 'address_bus');
+            svg.appendChild(addrBus);
+            
+            const addrLabel = document.createElementNS(NS, 'text');
+            addrLabel.setAttribute('x', 20);
+            addrLabel.setAttribute('y', 365);
+            addrLabel.setAttribute('class', 'bus-label');
+            addrLabel.textContent = 'Address Bus (16-bit)';
+            svg.appendChild(addrLabel);
+            
+            // Data Bus
+            const dataBus = document.createElementNS(NS, 'line');
+            dataBus.setAttribute('x1', buses.dataBus.x1);
+            dataBus.setAttribute('y1', buses.dataBus.y1);
+            dataBus.setAttribute('x2', buses.dataBus.x2);
+            dataBus.setAttribute('y2', buses.dataBus.y2);
+            dataBus.setAttribute('class', 'bus-line');
+            dataBus.setAttribute('id', 'data_bus');
+            svg.appendChild(dataBus);
+            
+            const dataLabel = document.createElementNS(NS, 'text');
+            dataLabel.setAttribute('x', 20);
+            dataLabel.setAttribute('y', 515);
+            dataLabel.setAttribute('class', 'bus-label');
+            dataLabel.textContent = 'Data Bus (8-bit)';
+            svg.appendChild(dataLabel);
+        }
+        
+        function updateRegisterDisplay(key, value) {
+            const valueElement = document.getElementById(`${key}_value`);
+            if (valueElement) {
+                valueElement.textContent = value;
+            }
+        }
+        
+        function activateComponent(key) {
+            const box = document.getElementById(`${key}_box`);
+            if (box) {
+                box.classList.add('active');
+                setTimeout(() => box.classList.remove('active'), 800);
+            }
+        }
+        
+        function activateWire(wireId) {
+            const wire = document.getElementById(wireId);
+            if (wire) {
+                wire.classList.add('active');
+                setTimeout(() => wire.classList.remove('active'), 800);
+            }
+        }
+        
+        function activateBus(busId) {
+            const bus = document.getElementById(busId);
+            if (bus) {
+                bus.classList.add('active');
+                setTimeout(() => bus.classList.remove('active'), 800);
+            }
+        }
+        
+        function animateDataFlow(fromX, fromY, toX, toY) {
+            const particle = document.createElementNS(NS, 'circle');
+            particle.setAttribute('cx', fromX);
+            particle.setAttribute('cy', fromY);
+            particle.setAttribute('r', '5');
+            particle.setAttribute('class', 'data-particle');
+            svg.appendChild(particle);
+            
+            const duration = 1000;
+            const startTime = Date.now();
+            
+            function animate() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                const currentX = fromX + (toX - fromX) * progress;
+                const currentY = fromY + (toY - fromY) * progress;
+                
+                particle.setAttribute('cx', currentX);
+                particle.setAttribute('cy', currentY);
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    particle.remove();
+                }
+            }
+            
+            animate();
+        }
+        
+        // Timing diagram
+        const canvas = document.getElementById('timingCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth;
+        canvas.height = 120;
+        
+        function drawTimingDiagram(tState, signals) {
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            ctx.clearRect(0, 0, width, height);
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            
+            // Draw grid
+            for (let i = 0; i <= 10; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * width/10, 0);
+                ctx.lineTo(i * width/10, height);
+                ctx.stroke();
+            }
+            
+            // Draw CLK
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            const tStateNum = parseInt(tState.substring(1));
+            for (let i = 0; i < tStateNum; i++) {
+                const x = i * width/10;
+                ctx.moveTo(x, 60);
+                ctx.lineTo(x, 20);
+                ctx.lineTo(x + width/20, 20);
+                ctx.lineTo(x + width/20, 60);
+                ctx.lineTo(x + width/10, 60);
+            }
+            ctx.stroke();
+            
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText('CLK', 5, 15);
+            ctx.fillText(tState, 5, 75);
+        }
+        
+        function updateControlSignals(signals) {
+            document.getElementById('sigIOM').textContent = signals.iom || '0';
+            document.getElementById('sigS1').textContent = signals.s1 || '0';
+            document.getElementById('sigS0').textContent = signals.s0 || '0';
+            document.getElementById('sigALE').textContent = signals.ale || '0';
+            document.getElementById('sigRD').textContent = signals.rd || '1';
+            document.getElementById('sigWR').textContent = signals.wr || '1';
+            document.getElementById('sigTState').textContent = signals.tstate || 'T1';
+        }
+        
+        // Socket handlers
+        function assembleCode() {
+            const code = document.getElementById('codeEditor').value;
+            socket.emit('assemble', { code: code });
+        }
+        
+        function executeStep() {
+            socket.emit('execute_step');
+        }
+        
+        function runProgram() {
+            running = true;
+            autoExecute();
+        }
+        
+        function autoExecute() {
+            if (running) {
+                socket.emit('execute_step');
+                setTimeout(autoExecute, 2000);
+            }
+        }
+        
+        function resetSimulator() {
+            running = false;
+            currentCycle = 0;
+            socket.emit('reset');
+            document.getElementById('errorPanel').classList.remove('show');
+            initDiagram();
+            drawTimingDiagram('T1', {});
+        }
+        
+        socket.on('assemble_result', function(data) {
+            const errorPanel = document.getElementById('errorPanel');
+            if (data.success) {
+                errorPanel.classList.remove('show');
+                document.getElementById('statusDisplay').textContent = 'Assembly Successful - Ready to Execute';
+            } else {
+                errorPanel.innerHTML = '<strong>Errors:</strong><br>' + data.errors.join('<br>');
+                errorPanel.classList.add('show');
+            }
+        });
+        
+        socket.on('animation_step', function(step) {
+            currentCycle++;
+            
+            document.getElementById('statusDisplay').textContent = 
+                `${step.phase}: ${step.description}`;
+            
+            // Animate flow
+            step.flow.forEach((component, index) => {
+                setTimeout(() => {
+                    const compKey = component.toLowerCase().replace('_', '');
+                    
+                    if (compKey === 'addressbus') {
+                        activateBus('address_bus');
+                    } else if (compKey === 'databus') {
+                        activateBus('data_bus');
+                    } else if (compKey === 'internalbus') {
+                        activateBus('internal_bus');
+                    } else if (components[compKey]) {
+                        activateComponent(compKey);
+                        
+                        // Animate data particles between components
+                        if (index > 0) {
+                            const prevComp = step.flow[index - 1].toLowerCase().replace('_', '');
+                            if (components[prevComp] && components[compKey]) {
+                                const from = components[prevComp];
+                                const to = components[compKey];
+                                animateDataFlow(
+                                    from.x + from.w/2,
+                                    from.y + from.h/2,
+                                    to.x + to.w/2,
+                                    to.y + to.h/2
+                                );
+                            }
+                        }
+                    }
+                    
+                    // Activate relevant wires
+                    if (compKey === 'accumulator' || compKey === 'alu') {
+                        activateWire('wire_acc_alu');
+                    }
+                    if (compKey === 'pc' || compKey === 'addrbuffer') {
+                        activateWire('wire_pc_addr');
+                    }
+                }, index * 1000);
+            });
+            
+            // Update control signals based on phase
+            const signals = {
+                iom: step.phase === 'FETCH' ? '0' : '1',
+                s1: step.phase === 'FETCH' ? '1' : '0',
+                s0: step.phase === 'EXECUTE' ? '1' : '0',
+                ale: currentCycle % 3 === 1 ? '1' : '0',
+                rd: step.phase === 'FETCH' ? '0' : '1',
+                wr: step.phase === 'EXECUTE' && step.description.includes('Writing') ? '0' : '1',
+                tstate: `T${(currentCycle % 4) + 1}`
+            };
+            
+            updateControlSignals(signals);
+            drawTimingDiagram(signals.tstate, signals);
+        });
+        
+        socket.on('state_update', function(state) {
+            // Update all register displays on the diagram
+            updateRegisterDisplay('accumulator', state.registers.A.toString(16).padStart(2, '0').toUpperCase() + 'H');
+            updateRegisterDisplay('regB', state.registers.B.toString(16).padStart(2, '0').toUpperCase() + 'H');
+            updateRegisterDisplay('regC', state.registers.C.toString(16).padStart(2, '0').toUpperCase() + 'H');
+            updateRegisterDisplay('regD', state.registers.D.toString(16).padStart(2, '0').toUpperCase() + 'H');
+            updateRegisterDisplay('regE', state.registers.E.toString(16).padStart(2, '0').toUpperCase() + 'H');
+            updateRegisterDisplay('regH', state.registers.H.toString(16).padStart(2, '0').toUpperCase() + 'H');
+            updateRegisterDisplay('regL', state.registers.L.toString(16).padStart(2, '0').toUpperCase() + 'H');
+            updateRegisterDisplay('pc', state.PC.toString(16).padStart(4, '0').toUpperCase() + 'H');
+            updateRegisterDisplay('sp', state.SP.toString(16).padStart(4, '0').toUpperCase() + 'H');
+            
+            // Update flags display
+            const flagStr = `${state.flags.S}${state.flags.Z}${state.flags.AC}${state.flags.P}${state.flags.CY}`;
+            updateRegisterDisplay('flags', flagStr);
+        });
+        
+        socket.on('execution_complete', function(data) {
+            running = false;
+            document.getElementById('statusDisplay').textContent = 'Execution Complete ✓';
+            document.getElementById('statusDisplay').style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        });
+        
+        socket.on('execution_error', function(data) {
+            running = false;
+            document.getElementById('statusDisplay').textContent = 'Error: ' + data.message;
+            document.getElementById('statusDisplay').style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+        });
+        
+        // Initialize on load
+        window.addEventListener('load', function() {
+            initDiagram();
+            drawTimingDiagram('T1', {});
+        });
+    </script>
+</body>
+</html>
